@@ -22,7 +22,7 @@ function generate_sbm_graph(n::Int, b::Int, p::Float64, q::Float64, filename::St
   filename::String = "./Resources/$filename"
   open(filename, "w") do file
     for edge in edges(g)
-      write(file, "$(src(edge)) $(dst(edge)) 1\n")
+      write(file, "$(src(edge)) $(dst(edge)) 10\n")
     end
   end
 
@@ -30,8 +30,7 @@ function generate_sbm_graph(n::Int, b::Int, p::Float64, q::Float64, filename::St
 end
 
 
-
-function run_graph(g::SimpleGraph, iter::Int, results::Dict)
+function run_graph(g::SimpleGraph, iter::Int, results::Dict, filename::String)
   results["Karger"] = Dict()
   graph::BasicGraph.Graph =
     BasicGraph.Graph(g.fadjlist, [(src(e), dst(e), 1.) for e in edges(g)], false)
@@ -85,13 +84,15 @@ function run_graph(g::SimpleGraph, iter::Int, results::Dict)
 end
 
 
-
-function run_sketch(g::SimpleGraph, iter::Int, results::Dict, m::Int)
+function run_sketch(g::SimpleGraph, iter::Int, results::Dict, m::Int, filename::String)
   println("Running sketch with m=$m, iter=$iter")
   results["Sketch_$m"] = Dict()
   graph_edges::Vector{Tuple{Int, Int, Float64}} = [(src(e), dst(e), 1.0) for e in edges(g)]
-  graph::EdgeSketch = EdgeSketch(m, graph_edges)
+  sketch::EdgeSketch = EdgeSketch(m, graph_edges)
 
+  for node in sketch.nodes
+    node.estimated_weight = EstimateNodeWeight(node, sketch.m)
+  end
 
   minimum_cut::Float64 = 0.0
   minimum_time::Float64 = Inf
@@ -102,7 +103,7 @@ function run_sketch(g::SimpleGraph, iter::Int, results::Dict, m::Int)
   for i in 1:iter
     println("Iteration $i")
     start = time()
-    cut::Float64 = SketchMinCut(graph)
+    cut::Float64 = SketchMinCut(sketch)
     elapsed = time() - start
 
     if cut == -1
@@ -164,8 +165,8 @@ function main(args::Array{String})
   g = generate_sbm_graph(n, b, p, q, filename)
 
   results::Dict = Dict()
-  run_graph(g, it, results)
-  run_sketch(g, it, results, m)
+  run_graph(g, it, results, filename)
+  run_sketch(g, it, results, m, filename)
 
 
   n::Int = nv(g)

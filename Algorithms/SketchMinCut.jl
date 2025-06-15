@@ -166,7 +166,7 @@ function SketchMinCut(sketch::EdgeSketch)::Float64
     contractEdge!(copy_sketch, i, j)
   end
 
-  estimation::Float64 = 0.0
+  estimation::Float64 = -1
   if copy_sketch.nodes[1] != copy_sketch.m
     estimation = (copy_sketch.m - 1) / sum(copy_sketch.nodes[1].S)
     estimation *=
