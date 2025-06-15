@@ -23,8 +23,7 @@ docs/site/
 # environment.
 Manifest*.toml
 
-
 # Custom resources
-./_Graveyard
-./Resources
-./Results
+_Graveyard
+Resources
+Results

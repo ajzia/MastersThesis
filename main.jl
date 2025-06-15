@@ -30,6 +30,7 @@ function generate_sbm_graph(n::Int, b::Int, p::Float64, q::Float64, filename::St
 end
 
 
+
 function run_graph(g::SimpleGraph, iter::Int, results::Dict)
   results["Karger"] = Dict()
   graph::BasicGraph.Graph =
@@ -82,6 +83,7 @@ function run_graph(g::SimpleGraph, iter::Int, results::Dict)
     write(file, JSON.json(results))
   end
 end
+
 
 
 function run_sketch(g::SimpleGraph, iter::Int, results::Dict, m::Int)
@@ -165,8 +167,19 @@ function main(args::Array{String})
   run_graph(g, it, results)
   run_sketch(g, it, results, m)
 
-  (minimum_cut, _) = StoerWagnerMinCut(g)
+
+  n::Int = nv(g)
+  adj_matrix::Matrix{Int} = zeros(Int, n, n)
+  for e in edges(g)
+    adj_matrix[src(e), dst(e)] = 1
+    adj_matrix[dst(e), src(e)] = 1
+  end
+
+  (minimum_cut, _) = StoerWagnerMinCut(adj_matrix)
   results["StoerWagner"] = Dict("minimum_cut" => minimum_cut)
+  open("./Results/$filename.json", "w") do file
+    write(file, JSON.json(results))
+  end
 end
 
 
