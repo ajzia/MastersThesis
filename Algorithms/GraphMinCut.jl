@@ -84,6 +84,9 @@ function GraphMinCut(graph::BasicGraph.Graph)::Float64
   copy_graph = deepcopy(graph)
 
   while length(copy_graph.node_ids) > 2
+    if length(copy_graph.node_ids) % 1000 == 0
+      println("Nodes left: ", length(copy_graph.node_ids))
+    end
    # choosing an edge to contract
     weights::Vector{Float64} = [edge[3] for edge in copy_graph.edges]
     weights /= sum(weights)
@@ -98,4 +101,3 @@ function GraphMinCut(graph::BasicGraph.Graph)::Float64
 
   return sum(edge[3] for edge in copy_graph.edges)
 end # GraphMinCut
-

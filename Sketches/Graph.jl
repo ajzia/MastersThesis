@@ -18,23 +18,51 @@ struct Graph
     edges,
     is_directed
   )
+  function Graph(no_nodes::Int, edges::Vector{Tuple{Int, Int, Float64}}, is_directed::Bool)::Graph
+    if no_nodes < 1
+      throw(ArgumentError("Number of nodes must be at least 1"))
+    end
+    if length(edges) < 0
+      throw(ArgumentError("Number of edges must be at least 0"))
+    end
+  
+    adj::Vector{Vector{Int}} = [Int[] for _ in 1:no_nodes]
+    for (i, j, _) in edges
+      push!(adj[i], j)
+      if !is_directed
+        push!(adj[j], i)
+      end
+    end
+  
+    return new(
+      [i for i in 1:no_nodes],
+      adj,
+      edges,
+      is_directed
+    )
+  end
 end # Graph
+
 
 
 function GraphCreate(stream::String)::Graph
   graph::Graph = Graph(false) # change!
 
   counter = 1
+  edges::Vector{Tuple{Int, Int, Float64}} = []
+  no_nodes::Int = 0
   open(stream) do file
-    for line in eachline(file)
+    while !eof(file)
+      line = readline(file)
       if startswith(line, "%") continue end
       if startswith(line, "#") continue end
-      edge = split(line, r"[\s,]")
+      edge = split(line, r"[\s,]+")
 
-      i = parse(Int, edge[1])
-      j = parse(Int, edge[2])
+      i = parse(Int, edge[1]) + 1
+      j = parse(Int, edge[2]) + 1
       w = parse(Float64, edge[3])
-      addEdge!(graph, i, j, w)
+      push!(edges, (i, j, w))
+      no_nodes = max(no_nodes, i, j)
 
       counter += 1
       if counter % 100000 == 0
@@ -43,7 +71,7 @@ function GraphCreate(stream::String)::Graph
     end
   end
 
-  return graph
+  return Graph(no_nodes, edges, false)
 end # GraphCreate
 
 
