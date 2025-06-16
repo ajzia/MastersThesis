@@ -29,7 +29,7 @@ function contractEdge!(sketch::EdgeSketch, i::Int, j::Int)
   idx_j::Int = findfirst(x -> x == j, sketch.node_ids)
 
   # create sketch (i, j) in place of the i-th node
-  for k in 1:sketch.m
+  @inbounds for k in 1:sketch.m
     if sketch.nodes[idx_i].S[k] > sketch.nodes[idx_j].S[k]
       sketch.nodes[idx_i].S[k] = sketch.nodes[idx_j].S[k]
       sketch.nodes[idx_i].F[k] = sketch.nodes[idx_j].F[k]
@@ -38,7 +38,7 @@ function contractEdge!(sketch::EdgeSketch, i::Int, j::Int)
 
 
   # replace every j with i
-  for (l, node) in enumerate(sketch.nodes)
+  @inbounds for (l, node) in enumerate(sketch.nodes)
     if node.id == j continue end
     for (k, edge) in enumerate(node.F)
       (u::Int, v::Int) = edge
@@ -98,7 +98,7 @@ Estimate the weight of edges in a node.
 """
 @inline function EstimateNodeWeight(node::NodeSketch, m::Int)::Float64
   estimation::Float64 = (m - 1) / sum(s for s in node.S if s != Inf)
-  estimation *= (m - node.inside_edges) / m
+  estimation *= (m - node.inside_edges - node.empty_edges) / m
 
   return estimation
 end # EstimateNodeWeight
@@ -120,11 +120,6 @@ function SketchMinCut(sketch::EdgeSketch)::Float64
   copy_sketch = deepcopy(sketch)
 
   while length(copy_sketch.node_ids) > 2
-    # debug print
-    if length(copy_sketch.node_ids) % 100 == 0
-      println("Nodes left: ", length(copy_sketch.node_ids))
-    end
-
     weights::Vector{Float64} = GetNodeWeights(copy_sketch)
 
     # Choosing first node
@@ -136,6 +131,7 @@ function SketchMinCut(sketch::EdgeSketch)::Float64
         println("No valid node found after 10 attempts, exiting.")
         return -1.0
       end
+
       i = sample(MersenneTwister(), copy_sketch.node_ids, Weights(weights))
       idx_i = findfirst(x -> x == i, copy_sketch.node_ids)
 
@@ -166,16 +162,7 @@ function SketchMinCut(sketch::EdgeSketch)::Float64
     contractEdge!(copy_sketch, i, j)
   end
 
-  estimation::Float64 = -1
-  if copy_sketch.nodes[1] != copy_sketch.m
-    estimation = (copy_sketch.m - 1) / sum(copy_sketch.nodes[1].S)
-    estimation *=
-      (copy_sketch.m - copy_sketch.nodes[1].inside_edges) / length(copy_sketch.m)
-  else
-    estimation = (copy_sketch.m - 1) / sum(copy_sketch.nodes[2].S)
-    estimation *=
-      (copy_sketch.m - copy_sketch.nodes[2].inside_edges) / length(copy_sketch.m)
-  end
+  estimation::Float64 = minimum(node.estimated_weight for node in copy_sketch.nodes)
 
   return estimation
 end # SketchMinCut

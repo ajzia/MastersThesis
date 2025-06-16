@@ -15,7 +15,7 @@ mutable struct NodeSketch
   empty_edges::Int
   estimated_weight::Float64
 
-  NodeSketch(id::Int, m::Int) = new(id, [(0, 0) for _ in 1:m], [Inf for _ in 1:m],  -Inf, 0, m, 0) 
+  NodeSketch(id::Int, m::Int) = new(id, [(0, 0) for _ in 1:m], [Inf for _ in 1:m],  Inf, 0, m, 0) 
 end # NodeSketch
 
 
@@ -23,12 +23,11 @@ struct EdgeSketch
   m::Int # sketch size
   node_ids::Vector{Int}
   nodes::Vector{NodeSketch}
-  stream::String # stream of edges with weights (file name)
 
-  EdgeSketch(m::Int, stream::String) = new(m, [], [], stream)
+  EdgeSketch(m::Int) = new(m, [], [])
   EdgeSketch(m::Int, edges::Vector{Tuple{Int, Int, Float64}}) = begin
-    sketch::EdgeSketch = EdgeSketch(m, "")
-    for (i, edge) in enumerate(edges)
+    sketch::EdgeSketch = EdgeSketch(m)
+    for edge in edges
       EdgeSketchInit(sketch, edge)
     end
     return sketch
@@ -37,7 +36,7 @@ end # EdgeSketch
 
 
 function EdgeSketchCreate(m::Int, stream::String)::EdgeSketch
-  sketch::EdgeSketch = EdgeSketch(m, stream)::EdgeSketch
+  sketch::EdgeSketch = EdgeSketch(m)::EdgeSketch
 
   # read stream of edges
   open(stream) do file
@@ -82,11 +81,10 @@ function EdgeSketchInit(sketch::EdgeSketch, edge::Tuple{Int, Int, Float64}, is_d
 end # EdgeSketchInit
 
 
-@inline function concatenate(x::Int, y::Int)::Int
-  new_x::String = string(x, base=2)
-  new_y::String = string(y, base=2)
-  return parse(Int, new_x * new_y, base=2)
-end
+@inline function Hash(value::String)::Float64
+  # Hashing function to generate a random number
+  return Float64((hash((value, 123)) % Int64(1e9))) / Float64(1e9)
+end # Hash
 
 
 function EdgeSketchUpdate(
@@ -101,34 +99,32 @@ function EdgeSketchUpdate(
 
   if !is_directed
     i, j = min(i, j), max(i, j)
-    Random.seed!(concatenate(i, j))
   end
-
+  
   sum::Float64 = 0.0
   update_max::Bool = false
   MAX::Float64 = node.max
+  Random.seed!(hash(bitstring(i) * bitstring(j)))
   
   # Update
   @inbounds for k in 1:m
-    value::Int = concatenate(concatenate(i, j), k)
-    U::Int128 = hash(value)
-    E::Float64 = log(U) / w_ij
+    value::String = bitstring(i) * bitstring(j) * bitstring(k)
+    U::Float64 = Hash(value)
+    E::Float64 = - log(U) / w_ij
 
     sum += E / (m - k + 1)
-    if sum >= MAX
-      update_max = true
-    end
+    if sum >= MAX break end
 
-    Random.seed!(concatenate(i, j))
-    r::Int = rand(range(k, m))
+    r::Int = rand(k:m)
     P[k], P[r] = P[r], P[k]
 
     l::Int = P[k]
-    if sum < node.S[l]
-      if node.S[l] == MAX
-        update_max = true
-      end
 
+    if node.S[l] == MAX
+      update_max = true
+    end
+
+    if sum < node.S[l]
       # Change number of empty edges
       if node.S[l] == Inf
         node.empty_edges -= 1

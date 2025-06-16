@@ -15,55 +15,44 @@ using JSON
 @inline join_path(file::String) = joinpath(@__DIR__, file)
 
 
-function generate_sbm_graph(n::Int, b::Int, p::Float64, q::Float64, filename::String)
-  println("Generating SBM with n=$n, b=$b, p=$p, q=$q")
-  (g, _) = generate_sbm_manual(n, b, p, q)
 
-  filename::String = "./Resources/$filename"
-  open(filename, "w") do file
-    for edge in edges(g)
-      write(file, "$(src(edge)) $(dst(edge)) 10\n")
-    end
-  end
-
-  return g
-end
-
-
-function run_graph(g::SimpleGraph, iter::Int, results::Dict, filename::String)
+function run_graph(g::SimpleGraph, iter::Int, results::Dict, filename::String, weights)
   results["Karger"] = Dict()
-  graph::BasicGraph.Graph =
-    BasicGraph.Graph(g.fadjlist, [(src(e), dst(e), 1.) for e in edges(g)], false)
+   graph::BasicGraph.Graph = BasicGraph.Graph(
+      g.fadjlist,
+      [(src(e), dst(e), weights[i]) for (i, e) in enumerate(edges(g))],
+      false
+    )
 
-  minimum_cut::Float64 = 0.0
+  minimum_cut::Float64 = Inf
   minimum_time::Float64 = Inf
   avg_time::Float64 = 0.0
   avg_cut::Float64 = 0.0
 
   failed_attempts::Int = 0
-  for i in 1:iter
-    println("Iteration $i")
+  @time for _ in 1:iter
     start = time()
     cut::Float64 = GraphMinCut(graph)
     elapsed = time() - start
 
-    if cut == -1
+    if cut == -1 || cut == 0.0
       failed_attempts += 1
       continue
     end
-
-    if elapsed < minimum_time
-      minimum_time = elapsed
+    
+    if cut < minimum_cut
       minimum_cut = cut
     end
+    if elapsed < minimum_time
+      minimum_time = elapsed
+    end
+
     avg_time += elapsed
     avg_cut += cut
   end
 
-
-  results["Karger"]["minimum_cut"] = minimum_cut
   
-  if (iter - failed_attempts) == 0
+  if iter - failed_attempts == 0
     results["Karger"]["average_cut"] = 0.0
     results["Karger"]["average_time"] = 0.0
   else
@@ -71,9 +60,11 @@ function run_graph(g::SimpleGraph, iter::Int, results::Dict, filename::String)
     results["Karger"]["average_time"] = avg_time / (iter - failed_attempts)
   end
   
+  results["Karger"]["minimum_cut"] = minimum_cut
   results["Karger"]["minimum_time"] = minimum_time
   results["Karger"]["iterations"] = iter
   results["Karger"]["failed_attempts"] = failed_attempts
+  results["Karger"]["memory"] = Base.summarysize(graph)
 
   println(results)
 
@@ -84,36 +75,40 @@ function run_graph(g::SimpleGraph, iter::Int, results::Dict, filename::String)
 end
 
 
-function run_sketch(g::SimpleGraph, iter::Int, results::Dict, m::Int, filename::String)
+
+function run_sketch(g::SimpleGraph, iter::Int, results::Dict, filename::String, m::Int, weights)
   println("Running sketch with m=$m, iter=$iter")
   results["Sketch_$m"] = Dict()
-  graph_edges::Vector{Tuple{Int, Int, Float64}} = [(src(e), dst(e), 1.0) for e in edges(g)]
+  graph_edges::Vector{Tuple{Int, Int, Float64}} =
+    [(src(e), dst(e), weights[i]) for (i, e) in enumerate(edges(g))]
   sketch::EdgeSketch = EdgeSketch(m, graph_edges)
 
   for node in sketch.nodes
     node.estimated_weight = EstimateNodeWeight(node, sketch.m)
   end
 
-  minimum_cut::Float64 = 0.0
+  minimum_cut::Float64 = Inf
   minimum_time::Float64 = Inf
   avg_time::Float64 = 0.0
   avg_cut::Float64 = 0.0
 
   failed_attempts::Int = 0
-  for i in 1:iter
-    println("Iteration $i")
+  for _ in 1:iter
     start = time()
     cut::Float64 = SketchMinCut(sketch)
     elapsed = time() - start
 
-    if cut == -1
+    if cut == -1 || cut == 0.0
       failed_attempts += 1
       continue
     end
 
+    if cut < minimum_cut
+      minimum_cut = cut
+    end
+
     if elapsed < minimum_time
       minimum_time = elapsed
-      minimum_cut = cut
     end
     avg_time += elapsed
     avg_cut += cut
@@ -130,6 +125,7 @@ function run_sketch(g::SimpleGraph, iter::Int, results::Dict, m::Int, filename::
   results["Sketch_$m"]["minimum_time"] = minimum_time
   results["Sketch_$m"]["iterations"] = iter
   results["Sketch_$m"]["failed_attempts"] = failed_attempts
+  results["Sketch_$m"]["memory"] = Base.summarysize(sketch)
 
   println(results)
 
@@ -149,7 +145,7 @@ function main(args::Array{String})
     println("p: intra-block connection probability")
     println("q: inter-block connection probability")
     println("iter: number of iterations for Karger's algorithm")
-    println("m: size of the sketch")
+    println("m: sketch size")
     return
   end
   
@@ -160,22 +156,35 @@ function main(args::Array{String})
   it::Int = parse(Int, args[5])
   m::Int = parse(Int, args[6])
 
-  filename::String = "graph_n$(n)_b$(b)_p$(p)_q$(q)_it$(it)_m$(m)"
 
-  g = generate_sbm_graph(n, b, p, q, filename)
+  # generate and save the graph
+  println("Generating SBM with n=$n, b=$b, p=$p, q=$q")
+  (g, _) = generate_sbm_manual(n, b, p, q)
+  weights::Vector{Float64} = [rand(10:20) for _ in 1:ne(g)]
 
+  filename::String = "graph_n$(n)_e$(ne(g))_b$(b)_p$(p)_q$(q)_it$(it)_m$(m)"
+  isdir("./Resources") || mkdir("./Resources")
+  open("./Resources/$filename", "w") do file
+    for (i, edge) in enumerate(edges(g))
+      write(file, "$(src(edge)) $(dst(edge)) $(weights[i])\n")
+    end
+  end
+
+
+  println("Generated graph with $(nv(g)) nodes and $(ne(g)) edges")
   results::Dict = Dict()
-  run_graph(g, it, results, filename)
-  run_sketch(g, it, results, m, filename)
+  run_graph(g, it, results, filename, weights)
+  run_sketch(g, it, results, filename, m, weights)
 
 
   n::Int = nv(g)
   adj_matrix::Matrix{Int} = zeros(Int, n, n)
-  for e in edges(g)
-    adj_matrix[src(e), dst(e)] = 1
-    adj_matrix[dst(e), src(e)] = 1
+  for (i, e) in enumerate(edges(g))
+    adj_matrix[src(e), dst(e)] = weights[i]
+    adj_matrix[dst(e), src(e)] = weights[i]
   end
 
+  if ne(g) > 250000 return end
   (minimum_cut, _) = StoerWagnerMinCut(adj_matrix)
   results["StoerWagner"] = Dict("minimum_cut" => minimum_cut)
   open("./Results/$filename.json", "w") do file
