@@ -1,20 +1,20 @@
 """
-    StoerWagnerMinCut(adj_matrix::Matrix{Int})
+    StoerWagnerMinCut(adj_matrix::Matrix{Float64})
 
 Finds the minimum cut of a graph using the Stoer-Wagner algorithm.
 
 # Parameters:
-- `adj_matrix::Matrix{Int}`: Adjacency matrix of the graph, where the
-                             element at position `(i, j)` represents
-                             the weight of the edge between nodes `i`
-                             and `j`.
+- `adj_matrix::Matrix{Float64}`: Adjacency matrix of the graph, where the
+                                 element at position `(i, j)` represents
+                                 the weight of the edge between nodes `i`
+                                 and `j`.
 
 # Returns:
 - `Tuple{Float64, Set{Int}}`: A tuple containing the weight of the
                               minimum cut and a set of nodes on one
                               side of the cut.
 """
-function StoerWagnerMinCut(adj_matrix::Matrix{Int})::Tuple{Float64, Set{Int}}
+function StoerWagnerMinCut(adj_matrix::Matrix{Float64})::Tuple{Float64, Set{Int}}
   n::Int = size(adj_matrix, 1)
   nodes::Vector{Int} = collect(1:n)
   best_weight::Float64 = typemax(Float64)

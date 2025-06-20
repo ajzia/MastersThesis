@@ -4,7 +4,7 @@ using StatsBase
 """
     contractEdge!(graph::BasicGraph.Graph, i::Int, j::Int)
 
-Contract an edge between nodes `i` and `j` in the graph,  updating the graph in place.
+Contract an edge between nodes `i` and `j` in the graph, updating the graph in place.
 
 # Parameters:
 - `graph::BasicGraph.Graph`: The graph containing the nodes and their properties.
@@ -23,49 +23,32 @@ function contractEdge!(graph::BasicGraph.Graph, i::Int, j::Int)
   end
 
   # check if edge (i, j) exists
-  if (i, j) ∉ [(x, y) for (x, y, _) in graph.edges]
+  if graph.adj[i, j] == 0.0 || (graph.is_directed && graph.adj[j, i] == 0.0)
     return
   end
 
-  # remove any edges between i and j
-  filter!(x -> x[1] != i || x[2] != j, graph.edges)
-  filter!(x -> x[1] != j || x[2] != i, graph.edges)
-
-  # remove j from i's adjacency list
-  idx::Int = findfirst(x -> x == i, graph.node_ids)
-  filter!(x -> x != j, graph.adj[idx])
-
-  # remove j from node_ids and adj
-  idx = findfirst(x -> x == j, graph.node_ids)
-  deleteat!(graph.node_ids, idx)
-  deleteat!(graph.adj, idx)
-
-  # update adjacencies
-  new_edges::Array{Int} = []
-  for (k, neighbours) in enumerate(graph.adj)
-    for (l, neighbour) in enumerate(neighbours)
-      if neighbour == j
-        graph.adj[k][l] = i
-        push!(new_edges, graph.node_ids[k])
+  # For each node k that was connected to j, add its edge weight to i
+  for k in 1:size(graph.adj, 1)
+    if k != i && k != j
+      if graph.adj[j, k] != 0.0
+        graph.adj[i, k] += graph.adj[j, k]
+      end
+      if graph.adj[k, j] != 0.0
+        graph.adj[k, i] += graph.adj[k, j]
       end
     end
   end
 
-  # append new edges to i's adjacency list
-  idx = findfirst(x -> x == i, graph.node_ids)
-  append!(graph.adj[idx], new_edges)
+  # Remove neighbours of j
+  graph.adj[j, :] .= 0.0
+  graph.adj[:, j] .= 0.0
 
-  # replace every j with i
-  for (k, edge) in enumerate(graph.edges)
-    (x, y, w) = edge
-    if x == j
-      graph.edges[k] = (i, y, w)
-    end
+  # Remove edge/s between i and j
+  graph.adj[i, j] = 0.0
 
-    if y == j
-      graph.edges[k] = (x, i, w)
-    end
-  end
+  # Remove j from node_ids
+  filter!(x -> x != j, graph.node_ids)
+  graph.no_nodes = length(graph.node_ids)
 end # contractEdge!
 
 
@@ -83,21 +66,29 @@ Find the minimum cut of a graph using the Karger's algorithm.
 function GraphMinCut(graph::BasicGraph.Graph)::Float64
   copy_graph = deepcopy(graph)
 
-  while length(copy_graph.node_ids) > 2
-    if length(copy_graph.node_ids) % 1000 == 0
-      println("Nodes left: ", length(copy_graph.node_ids))
+  while copy_graph.no_nodes > 2
+    if copy_graph.no_nodes % 1000 == 0
+      println("Nodes left: ", copy_graph.no_nodes)
     end
    # choosing an edge to contract
-    weights::Vector{Float64} = [edge[3] for edge in copy_graph.edges]
+    edges::Vector{Tuple{Int, Int}} = [Tuple(ij) for ij in CartesianIndices(copy_graph.adj) if copy_graph.adj[ij] != 0.0]
+    weights::Vector{Float64} = [copy_graph.adj[i, j] for (i, j) in edges]
     weights /= sum(weights)
     
-    (i, j, _) = sample(copy_graph.edges, Weights(weights))
+    (i, j) = sample(edges, Weights(weights))
     contractEdge!(copy_graph, i, j)
   end
 
-  if isempty(copy_graph.edges)
+  if all(copy_graph.adj .== 0.0)
     return -1.0
   end
 
-  return sum(edge[3] for edge in copy_graph.edges)
+  if copy_graph.is_directed
+    return sum(copy_graph.adj)
+  end
+
+  # for undirected graphs, we only count the upper triangle of the adjacency matrix
+  return sum([copy_graph.adj[i, j]
+             for i in 1:size(copy_graph.adj, 1)
+             for j in i+1:size(copy_graph.adj, 2)])
 end # GraphMinCut

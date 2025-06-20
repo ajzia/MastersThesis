@@ -12,14 +12,14 @@ Create a new node sketch with the given ID and sketch size `m`.
 """
 mutable struct NodeSketch
   id::Int
-  F::Vector{Tuple{Int, Int}}
+  F::Vector{Tuple{Int16, Int16}}
   S::Vector{Float64}
   max::Float64
   inside_edges::Int
   empty_edges::Int
   estimated_weight::Float64
 
-  NodeSketch(id::Int, m::Int) = new(id, [(0, 0) for _ in 1:m], [Inf for _ in 1:m],  Inf, 0, m, 0) 
+  NodeSketch(id::Int, m::Int) = new(id, [(Int16(0), Int16(0)) for _ in 1:m], [Inf for _ in 1:m],  Inf, 0, m, 0) 
 end # NodeSketch
 
 
@@ -69,8 +69,14 @@ function EdgeSketchCreate(m::Int, stream::String)::EdgeSketch
       if startswith(line, "%") continue end
       if startswith(line, "#") continue end
       edge = split(line, r"[\s,]")
-      i = parse(Int, edge[1])
-      j = parse(Int, edge[2])
+
+      i::Int16 = parse(Int, edge[1]) + 1
+      j::Int16 = parse(Int, edge[2]) + 1
+
+      if startswith(basename(stream), "graph_") # This is generated
+        i = i - 1
+        j = j - 1
+      end
 
       if i == j continue end
       w = parse(Float64, edge[3])

@@ -38,26 +38,25 @@ Run Karger's algorithm on the given graph and store the results.
 - `filename::String`: The name of the file where results will be saved.
 - `weights::Vector{Float64}`: A vector of weights for the edges in the graph.
 """
-function run_graph(
-  g::SimpleGraph,
-  iter::Int,
-  results::Dict,
-  filename::String,
-  weights::Vector{Float64}
-)
-  avg_degree = sum(degree(g)) / nv(g)
-  println("Min degree: $(δ(g)), Max degree: $(Δ(g)), Average degree: $(avg_degree)")
+function run_graph(g::SimpleGraph, iter::Int, results::Dict, filename::String, weights::Vector{Float64})
+  println("Min degree: $(δ(g)), Max degree: $(Δ(g))")
+  adj_matrix::Matrix{Float64} = zeros(Float64, nv(g), nv(g))
+  for (i, e) in enumerate(edges(g))
+    adj_matrix[src(e), dst(e)] = weights[i]
+    # if !g.is_directed
+    adj_matrix[dst(e), src(e)] = weights[i]
+    # end
+  end
   graph::BasicGraph.Graph = BasicGraph.Graph(
-    g.fadjlist,
-    [(src(e), dst(e), weights[i]) for (i, e) in enumerate(edges(g))],
+    adj_matrix,
     false
   )
-  run_graph(graph, iter, results, filename, weights)
+  run_graph(graph, iter, results, filename)
 end
 
 
 """
-    run_graph(graph::BasicGraph.Graph, iter::Int, results::Dict, filename::String, weights::Vector{Float64})
+    run_graph(graph::BasicGraph.Graph, iter::Int, results::Dict, filename::String)
 
 Run Karger's algorithm on the given graph and store the results.
 
@@ -66,9 +65,8 @@ Run Karger's algorithm on the given graph and store the results.
 - `iter::Int`: The number of iterations to run Karger's algorithm.
 - `results::Dict`: A dictionary to store the results of the algorithm.
 - `filename::String`: The name of the file where results will be saved.
-- `weights::Vector{Float64}`: A vector of weights for the edges in the graph.
 """
-function run_graph(graph::BasicGraph.Graph, iter::Int, results::Dict, filename::String, weights::Vector{Float64})
+function run_graph(graph::BasicGraph.Graph, iter::Int, results::Dict, filename::String)
   results["Karger"] = Dict{String, Union{Float64, Int}}(
     "minimum_cut" => 0.0,
     "minimum_time" => 0.0,
@@ -89,7 +87,7 @@ function run_graph(graph::BasicGraph.Graph, iter::Int, results::Dict, filename::
     cut::Float64 = GraphMinCut(graph)
     elapsed = time() - start
     print("Iteration: $i, Cut: $cut, Elapsed: $elapsed\n")
-
+ 
     if cut == -1 || cut == 0.0
       failed_attempts += 1
       continue
@@ -130,7 +128,8 @@ end
 
 
 """
-    run_sketch(g::SimpleGraph,iter::Int, results::Dict, filename::String, ms::Vector{Int}, weights::Vector{Float64})
+    run_sketch(g::SimpleGraph,iter::Int, results::Dict, filename::String,
+               ms::Vector{Int}, weights::Vector{Float64})
 
 Run Karger's algorithm for sketches on the given graph edges and store the results.
 
@@ -150,33 +149,56 @@ function run_sketch(
   ms::Vector{Int},
   weights::Vector{Float64}
 )
-  graph_edges::Vector{Tuple{Int, Int, Float64}} =
-    [(src(e), dst(e), weights[i]) for (i, e) in enumerate(edges(g))]
-
-  return run_sketch(graph_edges, iter, results, filename, ms)    
+  graph_edges::Vector{Tuple{Int, Int, Float64}} = [
+    (src(e), dst(e), weights[i]) for (i, e) in enumerate(edges(g))
+  ]
+  return run_sketch(deepcopy(graph_edges), iter, results, filename, ms)    
 end
 
 
+
+#   run_sketch(filename, it, results, ms)
 """
-    run_sketch(g::BasicGraph.Graph, iter::Int, results::Dict, filename::String, ms::Vector{Int}, weights::Vector{Float64})
+    run_sketch(filename::String, iter::Int, results::Dict, ms::Vector{Int})
 
 Run Karger's algorithm for sketches on the given graph and store the results.
 
 # Parameters:
-- `g::BasicGraph.Graph`: The graph on which Karger's algorithm for sketches will be run.
+- `filename::String`: The name of the file where results will be saved.
 - `iter::Int`: The number of iterations to run Karger's algorithm.
 - `results::Dict`: A dictionary to store the results of the algorithm.
-- `filename::String`: The name of the file where results will be saved.
 - `ms::Vector{Int}`: A vector of sketch sizes to be used in the algorithm.
-- `weights::Vector{Float64}`: A vector of weights for the edges in the graph.
 """
-function run_sketch(g::BasicGraph.Graph, iter::Int, results::Dict, filename::String, ms::Vector{Int}, weights::Vector{Float64})
-  return run_sketch(deepcopy(g.edges), iter, results, filename, ms)
+function run_sketch(filename::String, iter::Int, results::Dict, ms::Vector{Int})
+  edges::Vector{Tuple{Int, Int, Float64}} = []
+  open(join_path(filename)) do file
+    for line in eachline(file)
+      if startswith(line, "%") continue end
+      if startswith(line, "#") continue end
+      edge = split(line, r"[\s,]+")
+
+      i = parse(Int, edge[1]) + 1
+      j = parse(Int, edge[2]) + 1
+
+      if startswith(basename(filename), "graph_") # This is generated
+        i = i - 1
+        j = j - 1
+      end
+
+      w = parse(Float64, edge[3])
+      push!(edges, (i, j, w))
+    end
+  end
+
+
+  return run_sketch(edges, iter, results, basename(filename), ms)
 end
 
 
+
 """
-    run_sketch(graph_edges::Vector{Tuple{Int, Int, Float64}}, iter::Int, results::Dict, filename::String, ms::Vector{Int})
+    run_sketch(graph_edges::Vector{Tuple{Int, Int, Float64}},
+               iter::Int, results::Dict, filename::String, ms::Vector{Int})
 
 Run Karger's algorithm for sketches on the given graph edges and store the results.
 
@@ -231,7 +253,7 @@ function run_sketch(
       if cut < minimum_cut
         minimum_cut = cut
       end
-
+ 
       if elapsed < minimum_time
         minimum_time = elapsed
       end
@@ -291,45 +313,28 @@ function main_from_file(args::Array{String})
   ms::Vector{Int} = parse.(Int, split(args[3], ","))
 
   println("Reading graph from $filename")
-  g::BasicGraph.Graph = GraphCreate(filename)
-  
-  degrees::Vector{Int} = [length(adj) for adj in g.adj]
-  # get index where degree is 0
-  idx = findfirst(deg -> deg == 0, degrees)
-  
-  println("==================================")
-  println("Graph has 0 degree at index: $idx")
-  println("Zero: $(count(deg -> deg == 0, degrees)) nodes with zero degree")
-  println("Min degree: $(minimum(degrees)), Max degree: $(maximum(degrees)), Average degree: $(sum(degrees) / length(degrees))")
-  println("==================================")
-  
-  weights::Vector{Float64} = [rand(10:20) for _ in 1:length(g.edges)]
+  g = GraphCreate(filename)
+
+  degrees::Vector{Int} = [sum(g.adj[i, :] .> 0) for i in 1:g.no_nodes]
 
   results::Dict = Dict()
   results["graph"] = Dict(
-    "nodes" => length(g.node_ids),
-    "edges" => length(g.edges),
+    "nodes" => g.no_nodes,
+    "edges" => g.no_edges,
     "iterations" => it,
     "min_degree" => minimum(degrees),
     "avg_degree" => sum(degrees) / length(degrees),
     "max_degree" => maximum(degrees),
   )
 
-  println("Read graph with $(length(g.node_ids)) nodes and $(length(g.edges)) edges")
+  println("Read graph with $(g.no_nodes) nodes and $(g.no_edges) edges")
   println("Running Karger's algorithm...")
-  run_graph(g, it, results, basename(filename), weights)
+  run_graph(g, it, results, basename(filename))
   println("Running Karger's algorithm for sketches...")
-  run_sketch(g, it, results, basename(filename), ms, weights)
+  run_sketch(filename, it, results, ms)
 
-  n::Int = length(g.node_ids)
-  adj_matrix::Matrix{Int} = zeros(Int, n, n)
-  for (i, j, w) in g.edges
-    adj_matrix[i, j] = weights[i]
-    adj_matrix[j, i] = weights[i]
-  end
-
-  if length(g.edges) > 250000 return end
-  (minimum_cut, _) = StoerWagnerMinCut(adj_matrix)
+  if g.no_edges > 250000 return end
+  (minimum_cut, _) = StoerWagnerMinCut(g.adj)
   results["StoerWagner"] = Dict("minimum_cut" => minimum_cut)
   results["Karger"]["avg. error"] = abs(results["Karger"]["average_cut"] - minimum_cut) / minimum_cut
   results["Karger"]["min_error"] = abs(results["Karger"]["minimum_cut"] - minimum_cut) / minimum_cut
@@ -404,10 +409,10 @@ function main_generate(args::Array{String})
 
 
   n::Int = nv(g)
-  adj_matrix::Matrix{Int} = zeros(Int, n, n)
+  adj_matrix::Matrix{Float64} = zeros(Float64, n, n)
   for (i, e) in enumerate(edges(g))
-    adj_matrix[src(e), dst(e)] = weights[i]
-    adj_matrix[dst(e), src(e)] = weights[i]
+    adj_matrix[src(e), dst(e)] = Float64(weights[i])
+    adj_matrix[dst(e), src(e)] = Float64(weights[i])
   end
 
   if ne(g) > 250000 return end
