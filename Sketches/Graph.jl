@@ -5,6 +5,12 @@ export addEdge!, removeEdge!
 export removeNode!
 
 
+"""
+    Graph(is_directed::Bool)
+    Graph(adj::Vector{Vector{Int}}, edges::Vector{Tuple{Int, Int, Float64}}, is_directed::Bool)
+
+Create a new graph, either empty or with given adjacency list and edges.
+"""
 struct Graph
   node_ids::Vector{Int}
   adj::Vector{Vector{Int}}
@@ -44,7 +50,18 @@ struct Graph
 end # Graph
 
 
+"""
+    GraphCreate(stream::String)::Graph
 
+Create a graph from a stream of edges.
+
+# Parameters:
+- `stream::String`: The path to the file containing edges
+                    in the format "i j w" or "i,j,w".
+
+# Returns:
+- `Graph`: An instance of `Graph` initialized with the edges from the stream.
+"""
 function GraphCreate(stream::String)::Graph
   graph::Graph = Graph(false) # change!
 
@@ -75,13 +92,19 @@ function GraphCreate(stream::String)::Graph
 end # GraphCreate
 
 
+"""
+    addEdge!(graph::Graph, i::Int, j::Int, w::Float64)
+
+Add an edge to the graph.
+
+# Parameters:
+- `graph::Graph`: The graph to which the edge will be added.
+- `i::Int`: The starting node of the edge.
+- `j::Int`: The ending node of the edge.
+- `w::Float64`: The weight of the edge.
+"""
 function addEdge!(graph::Graph, i::Int, j::Int, w::Float64)
   if (i, j, w) in graph.edges
-    return
-  end
-
-  # check if there already is an edge with other weight
-  if (i, j) in [(x, y) for (x, y, _) in graph.edges]
     return
   end
 
@@ -102,12 +125,21 @@ function addEdge!(graph::Graph, i::Int, j::Int, w::Float64)
   if !graph.is_directed
     index_j::Int = findfirst(x -> x == j, graph.node_ids)
     push!(graph.adj[index_j], i)
-  #   push!(graph.edges, (j, i, w))
   end
 end # addEdge!
 
 
-# add removing edge without weight
+"""
+    removeEdge!(graph::Graph, i::Int, j::Int, w::Float64)
+
+Remove an edge from the graph.
+
+# Parameters:
+- `graph::Graph`: The graph from which the edge will be removed.
+- `i::Int`: The starting node of the edge.
+- `j::Int`: The ending node of the edge.
+- `w::Float64`: The weight of the edge.
+"""
 function removeEdge!(graph::Graph, i::Int, j::Int, w::Float64)
   if (i, j, w) ∉ graph.edges
     return
@@ -137,6 +169,15 @@ function removeEdge!(graph::Graph, i::Int, j::Int, w::Float64)
 end # removeEdge!
 
 
+"""
+    removeNode!(graph::Graph, node::Int)
+
+Remove a node from the graph.
+
+# Parameters:
+- `graph::Graph`: The graph from which the node will be removed.
+- `node::Int`: The ID of the node to be removed.
+"""
 function removeNode!(graph::Graph, node::Int)
   if node ∉ graph.node_ids
     return
@@ -164,6 +205,14 @@ function removeNode!(graph::Graph, node::Int)
 end # removeNode!
 
 
+"""
+    printGraph(graph::Graph)::Nothing
+
+Print the details of the graph.
+
+# Parameters:
+- `graph::Graph`: The graph to be printed.
+"""
 function printGraph(graph::Graph)::Nothing
   println("Graph:")
   println("> Directed: ", graph.is_directed)

@@ -12,10 +12,41 @@ include("./SBM.jl")
 using JSON
 
 
+"""
+    join_path(file::String)
+
+Join the given file path with the current directory.
+
+# Parameters:
+- `file::String`: The file path to be joined.
+
+# Returns:
+- `String`: The joined file path.
+"""
 @inline join_path(file::String) = joinpath(@__DIR__, file)
 
-function run_graph(g::SimpleGraph, iter::Int, results::Dict, filename::String, weights::Vector{Float64})
-  println("Min degree: $(δ(g)), Max degree: $(Δ(g))")
+
+"""
+    run_graph(g::SimpleGraph, iter::Int, results::Dict, filename::String, weights::Vector{Float64})
+
+Run Karger's algorithm on the given graph and store the results.
+
+# Parameters:
+- `g::SimpleGraph`: The graph on which Karger's algorithm will be run.
+- `iter::Int`: The number of iterations to run Karger's algorithm.
+- `results::Dict`: A dictionary to store the results of the algorithm.
+- `filename::String`: The name of the file where results will be saved.
+- `weights::Vector{Float64}`: A vector of weights for the edges in the graph.
+"""
+function run_graph(
+  g::SimpleGraph,
+  iter::Int,
+  results::Dict,
+  filename::String,
+  weights::Vector{Float64}
+)
+  avg_degree = sum(degree(g)) / nv(g)
+  println("Min degree: $(δ(g)), Max degree: $(Δ(g)), Average degree: $(avg_degree)")
   graph::BasicGraph.Graph = BasicGraph.Graph(
     g.fadjlist,
     [(src(e), dst(e), weights[i]) for (i, e) in enumerate(edges(g))],
@@ -24,6 +55,19 @@ function run_graph(g::SimpleGraph, iter::Int, results::Dict, filename::String, w
   run_graph(graph, iter, results, filename, weights)
 end
 
+
+"""
+    run_graph(graph::BasicGraph.Graph, iter::Int, results::Dict, filename::String, weights::Vector{Float64})
+
+Run Karger's algorithm on the given graph and store the results.
+
+# Parameters:
+- `graph::BasicGraph.Graph`: The graph on which Karger's algorithm will be run.
+- `iter::Int`: The number of iterations to run Karger's algorithm.
+- `results::Dict`: A dictionary to store the results of the algorithm.
+- `filename::String`: The name of the file where results will be saved.
+- `weights::Vector{Float64}`: A vector of weights for the edges in the graph.
+"""
 function run_graph(graph::BasicGraph.Graph, iter::Int, results::Dict, filename::String, weights::Vector{Float64})
   results["Karger"] = Dict{String, Union{Float64, Int}}(
     "minimum_cut" => 0.0,
@@ -84,19 +128,73 @@ function run_graph(graph::BasicGraph.Graph, iter::Int, results::Dict, filename::
   end
 end
 
-function run_sketch(g::SimpleGraph, iter::Int, results::Dict, filename::String, ms::Vector{Int}, weights::Vector{Float64})
+
+"""
+    run_sketch(g::SimpleGraph,iter::Int, results::Dict, filename::String, ms::Vector{Int}, weights::Vector{Float64})
+
+Run Karger's algorithm for sketches on the given graph edges and store the results.
+
+# Parameters:
+- `g::SimpleGraph`: Generated graph to run Karger's algorithm on.
+- `iter::Int`: The number of iterations to run Karger's algorithm.
+- `results::Dict`: A dictionary to store the results of the algorithm.
+- `filename::String`: The name of the file where results will be saved.
+- `ms::Vector{Int}`: A vector of sketch sizes to be used in the algorithm.
+- `weights::Vector{Float64}`: A vector of weights for the edges in the graph.
+"""
+function run_sketch(
+  g::SimpleGraph,
+  iter::Int,
+  results::Dict,
+  filename::String,
+  ms::Vector{Int},
+  weights::Vector{Float64}
+)
   graph_edges::Vector{Tuple{Int, Int, Float64}} =
     [(src(e), dst(e), weights[i]) for (i, e) in enumerate(edges(g))]
 
   return run_sketch(graph_edges, iter, results, filename, ms)    
 end
 
+
+"""
+    run_sketch(g::BasicGraph.Graph, iter::Int, results::Dict, filename::String, ms::Vector{Int}, weights::Vector{Float64})
+
+Run Karger's algorithm for sketches on the given graph and store the results.
+
+# Parameters:
+- `g::BasicGraph.Graph`: The graph on which Karger's algorithm for sketches will be run.
+- `iter::Int`: The number of iterations to run Karger's algorithm.
+- `results::Dict`: A dictionary to store the results of the algorithm.
+- `filename::String`: The name of the file where results will be saved.
+- `ms::Vector{Int}`: A vector of sketch sizes to be used in the algorithm.
+- `weights::Vector{Float64}`: A vector of weights for the edges in the graph.
+"""
 function run_sketch(g::BasicGraph.Graph, iter::Int, results::Dict, filename::String, ms::Vector{Int}, weights::Vector{Float64})
   return run_sketch(deepcopy(g.edges), iter, results, filename, ms)
 end
 
 
-function run_sketch(graph_edges::Vector{Tuple{Int, Int, Float64}}, iter::Int, results::Dict, filename::String, ms::Vector{Int})
+"""
+    run_sketch(graph_edges::Vector{Tuple{Int, Int, Float64}}, iter::Int, results::Dict, filename::String, ms::Vector{Int})
+
+Run Karger's algorithm for sketches on the given graph edges and store the results.
+
+# Parameters:
+- `graph_edges::Vector{Tuple{Int, Int, Float64}}`: A vector of edges in the format
+                                                   (source, destination, weight).
+- `iter::Int`: The number of iterations to run Karger's algorithm.
+- `results::Dict`: A dictionary to store the results of the algorithm.
+- `filename::String`: The name of the file where results will be saved.
+- `ms::Vector{Int}`: A vector of sketch sizes to be used in the algorithm.
+"""
+function run_sketch(
+  graph_edges::Vector{Tuple{Int, Int, Float64}},
+  iter::Int,
+  results::Dict,
+  filename::String,
+  ms::Vector{Int}
+)
   for m in ms
     println("Running sketch with m=$m, iter=$iter")
     results["Sketch_$m"] = Dict{String, Union{Float64, Int}}(
@@ -169,12 +267,14 @@ function run_sketch(graph_edges::Vector{Tuple{Int, Int, Float64}}, iter::Int, re
 
 end
 
+
 function from_file_usage()
   println("Usage: julia main.jl FROM_FILE <file> <iter> m1,m2,...,mn")
   println("file: path to the graph file")
   println("iter: number of iterations for Karger's algorithm")
   println("m1,m2,...,mn: sketch sizes (comma-separated)")
 end
+
 
 function main_from_file(args::Array{String})
   if length(args) != 3
@@ -191,7 +291,18 @@ function main_from_file(args::Array{String})
   ms::Vector{Int} = parse.(Int, split(args[3], ","))
 
   println("Reading graph from $filename")
-  g = GraphCreate(filename)
+  g::BasicGraph.Graph = GraphCreate(filename)
+  
+  degrees::Vector{Int} = [length(adj) for adj in g.adj]
+  # get index where degree is 0
+  idx = findfirst(deg -> deg == 0, degrees)
+  
+  println("==================================")
+  println("Graph has 0 degree at index: $idx")
+  println("Zero: $(count(deg -> deg == 0, degrees)) nodes with zero degree")
+  println("Min degree: $(minimum(degrees)), Max degree: $(maximum(degrees)), Average degree: $(sum(degrees) / length(degrees))")
+  println("==================================")
+  
   weights::Vector{Float64} = [rand(10:20) for _ in 1:length(g.edges)]
 
   results::Dict = Dict()
@@ -199,6 +310,9 @@ function main_from_file(args::Array{String})
     "nodes" => length(g.node_ids),
     "edges" => length(g.edges),
     "iterations" => it,
+    "min_degree" => minimum(degrees),
+    "avg_degree" => sum(degrees) / length(degrees),
+    "max_degree" => maximum(degrees),
   )
 
   println("Read graph with $(length(g.node_ids)) nodes and $(length(g.edges)) edges")
@@ -231,6 +345,7 @@ function main_from_file(args::Array{String})
   println("Results saved to ./Results/$(basename(filename))_results.json")
 end
 
+
 function generate_usage()
   println("Usage: julia main.jl GENERATE <n> <b> <p> <q> <iter> <m1,m2,...,mn>")
   println("n: number of nodes")
@@ -240,6 +355,7 @@ function generate_usage()
   println("iter: number of iterations for Karger's algorithm")
   println("m1,m2,...,mn: sketch sizes (comma-separated)")
 end
+
 
 function main_generate(args::Array{String})
   if length(args) != 6
@@ -275,6 +391,9 @@ function main_generate(args::Array{String})
     "p" => p,
     "q" => q,
     "iterations" => it,
+    "min_degree" => δ(g),
+    "avg_degree" => sum(degree(g)) / nv(g),
+    "max_degree" => Δ(g)
   )
 
   println("Generated graph with $(nv(g)) nodes and $(ne(g)) edges")
@@ -307,7 +426,6 @@ function main_generate(args::Array{String})
     write(file, JSON.json(results, 2),)
   end
 end
-
 
 
 if abspath(PROGRAM_FILE) == @__FILE__

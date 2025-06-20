@@ -5,7 +5,11 @@ using Random
 export EdgeSketch, NodeSketch
 export EdgeSketchCreate
 
+"""
+    NodeSketch(id::Int, m::Int)
 
+Create a new node sketch with the given ID and sketch size `m`.
+"""
 mutable struct NodeSketch
   id::Int
   F::Vector{Tuple{Int, Int}}
@@ -19,6 +23,13 @@ mutable struct NodeSketch
 end # NodeSketch
 
 
+"""
+    EdgeSketch(m::Int)
+    EdgeSketch(m::Int, edges::Vector{Tuple{Int, Int, Float64}})
+
+Create a new edge sketch with size `m` and initialize it with
+the given edges.
+"""
 struct EdgeSketch
   m::Int # sketch size
   node_ids::Vector{Int}
@@ -35,6 +46,20 @@ struct EdgeSketch
 end # EdgeSketch
 
 
+"""
+    EdgeSketchCreate(m::Int, stream::String)::EdgeSketch
+
+Create an edge sketch from a stream of edges.
+
+# Parameters:
+- `m::Int`: The size of the sketch.
+- `stream::String`: The path to the file containing edges
+                    in the format "i j w" or "i,j,w".
+
+# Returns:
+- `EdgeSketch`: An instance of `EdgeSketch` initialized with
+                the edges from the stream.
+"""
 function EdgeSketchCreate(m::Int, stream::String)::EdgeSketch
   sketch::EdgeSketch = EdgeSketch(m)::EdgeSketch
 
@@ -57,6 +82,16 @@ function EdgeSketchCreate(m::Int, stream::String)::EdgeSketch
 end # EdgeSketchCreate
 
 
+"""
+    EdgeSketchInit(sketch::EdgeSketch, edge::Tuple{Int, Int, Float64}, is_directed::Bool=false)
+
+Initialize the edge sketch with a new edge.
+
+# Parameters:
+- `sketch::EdgeSketch`: The edge sketch to be initialized.
+- `edge::Tuple{Int, Int, Float64}`: The edge to be added.
+- `is_directed::Bool`: Whether the edge is directed or not (default=false).
+"""
 function EdgeSketchInit(sketch::EdgeSketch, edge::Tuple{Int, Int, Float64}, is_directed::Bool=false)
   (i::Int, j::Int, _) = edge
 
@@ -81,6 +116,19 @@ function EdgeSketchInit(sketch::EdgeSketch, edge::Tuple{Int, Int, Float64}, is_d
 end # EdgeSketchInit
 
 
+
+"""
+    Hash(value::String)::Float64
+
+Generate a hash for a given string value, returning a
+random number between 0 and 1.
+
+# Parameters:
+- `value::String`: The string value to be hashed.
+
+# Returns:
+- `Float64`: A random number between 0 and 1 generated from the hash.
+"""
 @inline function Hash(value::String)::Float64
   # Hashing function to generate a random number
   return Float64((hash((value, 123)) % Int64(1e9))) / Float64(1e9)

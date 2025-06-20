@@ -1,62 +1,71 @@
-# Finding opt min-cut
-function StoerWagnerMinCut(adj_matrix::Matrix{Int})
-  n = size(adj_matrix, 1)
-  nodes = collect(1:n)
-  best_cut_weight = typemax(Int)
-  best_cut_set = Set{Int}()
+"""
+    StoerWagnerMinCut(adj_matrix::Matrix{Int})
+
+Finds the minimum cut of a graph using the Stoer-Wagner algorithm.
+
+# Parameters:
+- `adj_matrix::Matrix{Int}`: Adjacency matrix of the graph, where the
+                             element at position `(i, j)` represents
+                             the weight of the edge between nodes `i`
+                             and `j`.
+
+# Returns:
+- `Tuple{Float64, Set{Int}}`: A tuple containing the weight of the
+                              minimum cut and a set of nodes on one
+                              side of the cut.
+"""
+function StoerWagnerMinCut(adj_matrix::Matrix{Int})::Tuple{Float64, Set{Int}}
+  n::Int = size(adj_matrix, 1)
+  nodes::Vector{Int} = collect(1:n)
+  best_weight::Float64 = typemax(Float64)
+  best_set::Set{Int} = Set{Int}()
 
   while length(nodes) > 1
-    A = [nodes[1]]
-    weights = zeros(Int, n)
-    used = falses(n)
+    A::Vector{Int} = [nodes[1]]
+    weights::Vector{Float64} = zeros(Float64, n)
+    used::Vector{Bool} = falses(n)
     used[nodes[1]] = true
 
-    for _ in 2:length(nodes)
-      # Find the most tightly connected unused node
+    @inbounds for _ in 2:length(nodes)
       for v in nodes
         if !used[v]
           weights[v] += adj_matrix[A[end], v]
         end
       end
 
-      # Choose the next node with max weight
-      max_w = -1
-      sel = -1
-      for v in nodes
-        if !used[v] && weights[v] > max_w
-          max_w = weights[v]
-          sel = v
+      max_weight::Float64 = -1
+      selected::Int = -1
+      @inbounds for v in nodes
+        if !used[v] && weights[v] > max_weight
+          max_weight = weights[v]
+          selected = v
         end
       end
 
-      push!(A, sel)
-      used[sel] = true
+      push!(A, selected)
+      used[selected] = true
     end
 
-    # Last two added nodes are s and t
-    s = A[end - 1]
-    t = A[end]
-    cut_weight = 0
-    for v in nodes
+    s::Int, t::Int = A[end - 1], A[end]
+    cut_weight::Float64 = 0
+    @inbounds for v in nodes
       cut_weight += adj_matrix[t, v]
     end
 
-    if cut_weight < best_cut_weight
-      best_cut_weight = cut_weight
-      best_cut_set = Set(A[1:end-1])
+    if cut_weight < best_weight
+      best_weight = cut_weight
+      best_set = Set(A[1:end-1])
     end
 
-    # Merge s and t into one node
-    for v in nodes
+    @inbounds for v in nodes
       if v != s && v != t
         adj_matrix[s, v] += adj_matrix[t, v]
         adj_matrix[v, s] = adj_matrix[s, v]
       end
     end
 
-    # Remove t from the graph
     filter!(x -> x != t, nodes)
   end
 
-  return best_cut_weight, best_cut_set
+  return best_weight, best_set
 end

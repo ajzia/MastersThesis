@@ -10,7 +10,7 @@ merging their properties and updating the sketch in place.
 
 # Parameters:
 - `sketch::EdgeSketch`: The sketch containing the nodes and
-                         their properties.
+                        their properties.
 - `i::Int`: The id of the first node.
 - `j::Int`: The id of the second node.
 """
@@ -72,7 +72,7 @@ to sum to 1.
 
 # Parameters:
 - `sketch::EdgeSketch`: The sketch containing the nodes
-                         and their properties.
+                        and their properties.
 
 # Returns:
 - `Vector{Float64}`: A vector of estimated weights for each
@@ -80,7 +80,9 @@ to sum to 1.
 """
 @inline function GetNodeWeights(sketch::EdgeSketch)::Vector{Float64}
   weights::Vector{Float64} = [node.estimated_weight for node in sketch.nodes]
-  return weights ./ sum(weights)
+  summed_weights::Float64 = sum(weights)
+  if summed_weights == 0.0 return -1 end
+  return weights ./ summed_weights
 end # GetNodeWeights
 
 
@@ -121,6 +123,10 @@ function SketchMinCut(sketch::EdgeSketch)::Float64
 
   while length(copy_sketch.node_ids) > 2
     weights::Vector{Float64} = GetNodeWeights(copy_sketch)
+    if weights == -1
+      println("Error: No valid node weights found.")
+      return -1.0
+    end
 
     # Choosing first node
     i::Int = 0
