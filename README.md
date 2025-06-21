@@ -1,8 +1,3 @@
-using JSON
-using Random
-using StatsBase
-using Graphs
-
 # Required packages
 
 To run the code, you need to have the following packages installed:
@@ -11,6 +6,7 @@ To run the code, you need to have the following packages installed:
 - Random
 - StatsBase
 - Graphs
+- Plots
 
 # Usage
 
